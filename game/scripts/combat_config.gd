@@ -34,9 +34,13 @@ const ATTACK_RADIUS                 : float = 16.0   # visual + collision half-s
 const ENEMY_MULTIPATTERN_SPEED_MULT : float = 0.72
 
 # ── Player cooldown ────────────────────────────────────────────────────────
-# After pressing a lane, that lane is locked for this duration.
-# Prevents mindless spam while keeping the input window generous.
-const PLAYER_LANE_COOLDOWN : float = 0.42  # seconds
+# Global cooldown (GCD): lockout across ALL lanes after any attack.
+# Prevents rolling fingers across A-S-D simultaneously.
+const PLAYER_GLOBAL_COOLDOWN      : float = 0.32  # seconds lockout on all lanes
+# Individual lane cooldown: prevents mashing the same lane.
+const PLAYER_LANE_COOLDOWN        : float = 0.48  # seconds lockout on the used lane
+# Rapid burst GCD during the enemy vulnerability window (allows rapid punishing combo).
+const PLAYER_VULN_GLOBAL_COOLDOWN : float = 0.14  # seconds
 
 # ── Health ─────────────────────────────────────────────────────────────────
 const PLAYER_MAX_HP : int = 100
@@ -47,7 +51,9 @@ const ENEMY_LANE_DAMAGE        : int = 18  # player takes this per unblocked ene
 const PLAYER_INTERCEPT_DAMAGE  : int = 12  # regular collision outside perfect zone
 const PLAYER_PERFECT_DAMAGE    : int = 20  # bonus for the perfect intercept itself
 const PLAYER_VULN_DAMAGE       : int = 35  # each lane press during vulnerability window
-const PLAYER_FREESWING_DAMAGE  : int =  5  # player attack reaches enemy with no collision
+# Free swings (reaching enemy without intercepting) deal 0 damage outside vulnerability.
+# Enemy armor deflects random projectiles — forces player to parry and earn openings!
+const PLAYER_FREESWING_DAMAGE  : int =  0
 
 # ── Stun / Vulnerability ───────────────────────────────────────────────────
 const VULNERABILITY_DURATION : float = 1.5  # seconds of bonus-damage window

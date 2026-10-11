@@ -81,12 +81,13 @@ func _process(delta: float) -> void:
 func _on_lane_pressed(lane: int) -> void:
     if _state == State.GAME_OVER:
         return
-    if not player.can_attack_lane(lane):
-        return  # cooldown active — silently ignore
+    var is_vuln : bool = (_state == State.VULNERABLE)
+    if not player.can_attack_lane(lane, is_vuln):
+        return  # global or lane cooldown active — ignore
 
-    player.start_lane_cooldown(lane)
+    player.start_lane_cooldown(lane, is_vuln)
 
-    if _state == State.VULNERABLE:
+    if is_vuln:
         # Enemy is stunned: direct damage, no projectile needed
         enemy.take_damage(CombatConfig.PLAYER_VULN_DAMAGE)
         arena.trigger_flash(lane, CombatConfig.COL_PERFECT, 0.22)
@@ -210,20 +211,23 @@ func _check_enemy_attacks_landed() -> void:
             _enemy_attacks.remove_at(i)
 
 func _check_player_attacks_reached_enemy() -> void:
-    # Player attacks that reach the enemy without intercepting deal a small poke.
+    # Player attacks that reach the enemy without intercepting
     for i in range(_player_attacks.size() - 1, -1, -1):
         var pa = _player_attacks[i]
         if not pa.node.is_alive():
             _player_attacks.remove_at(i)
             continue
         if pa.node.position.y <= CombatConfig.ENEMY_Y:
-            # Free swing: only deal damage outside vulnerability
-            # (vuln damage is handled directly in _on_lane_pressed)
+            # Free swing: outside vulnerability
             if _state != State.VULNERABLE:
-                enemy.take_damage(CombatConfig.PLAYER_FREESWING_DAMAGE)
-                arena.trigger_flash(pa.lane, CombatConfig.COL_PLAYER_ATTACK, 0.15)
-                hud.show_status("POKE! -%d" % CombatConfig.PLAYER_FREESWING_DAMAGE)
-                hud.update_health(player.hp, player.max_hp, enemy.hp, enemy.max_hp)
+                if CombatConfig.PLAYER_FREESWING_DAMAGE > 0:
+                    enemy.take_damage(CombatConfig.PLAYER_FREESWING_DAMAGE)
+                    arena.trigger_flash(pa.lane, CombatConfig.COL_PLAYER_ATTACK, 0.15)
+                    hud.show_status("POKE! -%d" % CombatConfig.PLAYER_FREESWING_DAMAGE)
+                    hud.update_health(player.hp, player.max_hp, enemy.hp, enemy.max_hp)
+                else:
+                    arena.trigger_flash(pa.lane, Color(0.45, 0.45, 0.55), 0.12)
+                    hud.show_status("DEFLECTED! (Enemy armored — parry to stun)")
             pa.node.kill()
             _player_attacks.remove_at(i)
 

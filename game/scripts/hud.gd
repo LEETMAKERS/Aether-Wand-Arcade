@@ -15,6 +15,7 @@ var _enemy_lbl  : Label
 var _player_lbl : Label
 var _status_lbl : Label
 var _cd_panels  : Array[Panel] = []
+var _gcd_bar    : ProgressBar
 
 # One colour per lane (left=blue, centre=green, right=orange)
 const LANE_COLORS : Array = [
@@ -35,6 +36,15 @@ func _process(_delta: float) -> void:
         var frac  : float = player.get_cooldown_fraction(i)
         # Dim the panel when on cooldown; full brightness when ready
         _cd_panels[i].modulate.a = lerp(1.0, 0.22, frac)
+
+    # Global cooldown bar feedback
+    if _gcd_bar != null:
+        var gcd_frac : float = player.get_global_cooldown_fraction()
+        if gcd_frac > 0.0:
+            _gcd_bar.modulate.a = 0.85
+            _gcd_bar.value      = (1.0 - gcd_frac) * 100.0
+        else:
+            _gcd_bar.modulate.a = 0.0
 
 # ── Public API ───────────────────────────────────────────────────────────
 
@@ -97,6 +107,14 @@ func _build() -> void:
     var hint := _lbl("A / ◀   S / ▼   D / ▶      R = Restart",
                      Vector2(640.0, 700.0), 14, true)
     hint.modulate = Color(0.45, 0.45, 0.55)
+
+    # Global cooldown indicator line (spans across all 3 lanes right above buttons)
+    var left_edge  : float = CombatConfig.LANE_X[0] - 54.0
+    var right_edge : float = CombatConfig.LANE_X[2] + 54.0
+    var total_w    : float = right_edge - left_edge
+    _gcd_bar = _bar(Vector2(left_edge, 644.0), Vector2(total_w, 4.0),
+                    Color(0.85, 0.95, 1.0, 0.9), 100)
+    _gcd_bar.modulate.a = 0.0
 
     # Perfect-zone annotation (right of the yellow dashed line)
     var pz_y   : float = CombatConfig.PLAYER_Y - CombatConfig.PERFECT_ZONE_HEIGHT

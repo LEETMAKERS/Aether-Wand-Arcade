@@ -20,5 +20,14 @@ Because you know Python, GDScript will feel very familiar.
 - **Want to see how attacks resolve?** Look at `_check_collisions()` in `scripts/combat_manager.gd`.
 - **Want to change visuals?** Look at `_draw()` in `scripts/arena.gd`.
 
-## Next Steps: Combat Design
-We are currently brainstorming the combat loop to prevent mindless button mashing and introduce real challenge based on timing and decision-making.
+## Combat Mechanics & Anti-Spam Design
+1. **Global Cooldown (GCD):**
+   - Pressing any lane triggers a brief lockout across **all three lanes** (`PLAYER_GLOBAL_COOLDOWN = 0.32s`).
+   - Each lane also has an individual cooldown (`PLAYER_LANE_COOLDOWN = 0.48s`).
+   - A thin recovery bar above the lane buttons shows GCD status in real time.
+2. **Deflection / Earned Openings:**
+   - Enemy armor deflects attacks outside the vulnerability window (`PLAYER_FREESWING_DAMAGE = 0`). Mindlessly spamming A/S/D deals 0 damage and locks you into recovery right before an enemy strike hits.
+   - You must intercept incoming attacks. A **Perfect Intercept** stuns the enemy and opens the 1.5s Vulnerability Window.
+3. **Vulnerability Burst:**
+   - During the Vulnerability Window, GCD drops to `0.14s`, allowing you to unleash a rapid punishing combo.
+
