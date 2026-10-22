@@ -34,15 +34,25 @@ enum CueState { IDLE, ACTIVE, RESOLVED }
 ## Optional AnimatedSprite2D placed in Arena to show elemental attack bursts.
 @export var attack_effect: AnimatedSprite2D
 
+@export_group("ESP32 Sensor Input")
+## UDP port Godot listens on for ESP32 sensor messages ("A", "B", "C", "R", "START").
+@export var sensor_udp_port: int = 4242
+## Automatically launch the background USB-Serial (/dev/ttyUSB*) to UDP bridge on Linux.
+@export var auto_start_serial_bridge: bool = true
+## Serial device path ("auto" scans /dev/ttyUSB* and /dev/ttyACM*, or e.g. "/dev/ttyUSB0").
+@export var serial_port: String = "auto"
+## Baud rate for the ESP32 USB-Serial connection.
+@export var serial_baud: int = 115200
+
 const START_CUE_ACTION: StringName = &"start_cue"
 const RESET_ACTION: StringName = &"reset_cast"
 
 ## Baseline round duration in milliseconds (60 seconds at 1.0x speed).
 const BASE_ROUND_DURATION_MS: int = 60000
 
-## File paths saved directly in the project folder.
-const HIGH_SCORE_FILE: String = "res://high_scores.txt"
-const GAME_LOG_FILE: String = "res://game_log.csv"
+## File names saved in the project folder (in editor) or next to the executable (when exported).
+const HIGH_SCORE_FILE: String = "high_scores.txt"
+const GAME_LOG_FILE: String = "game_log.csv"
 
 ## 21 contact times in milliseconds at 1.0x speed (from docs/game-design.md).
 const PRESET_CONTACT_MS: Array[int] = [
@@ -113,10 +123,69 @@ var _break_total: int = 0
 var _high_score: float = 1.0
 var _high_score_holder: String = "-"
 
+var _udp_peer: PacketPeerUDP
+var _serial_bridge_pid: int = -1
+
+const SERIAL_BRIDGE_PY: String = """
+import os, sys, glob, time, select, socket, termios, tty
+udp_port = int(sys.argv[1])
+port_arg = sys.argv[2]
+baud_arg = int(sys.argv[3])
+BAUD_MAP = {9600: termios.B9600, 57600: termios.B57600, 115200: termios.B115200, 230400: termios.B230400}
+baud_const = BAUD_MAP.get(baud_arg, termios.B115200)
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+dest = ("127.0.0.1", udp_port)
+
+def find_port():
+	if port_arg != "auto":
+		return port_arg if os.path.exists(port_arg) else None
+	ports = sorted(glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*"))
+	return ports[0] if ports else None
+
+while True:
+	p = find_port()
+	if not p:
+		time.sleep(0.5)
+		continue
+	fd = None
+	try:
+		fd = os.open(p, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+		tty.setraw(fd)
+		attrs = termios.tcgetattr(fd)
+		attrs[4] = baud_const
+		attrs[5] = baud_const
+		attrs[2] |= (termios.CLOCAL | termios.CREAD)
+		attrs[2] &= ~termios.CRTSCTS
+		termios.tcsetattr(fd, termios.TCSANOW, attrs)
+		termios.tcflush(fd, termios.TCIFLUSH)
+		buf = b""
+		while True:
+			r, _, _ = select.select([fd], [], [], 0.5)
+			if fd in r:
+				chunk = os.read(fd, 256)
+				if not chunk:
+					break
+				buf += chunk
+				while b"\\n" in buf:
+					line, buf = buf.split(b"\\n", 1)
+					msg = line.strip()
+					if msg:
+						sock.sendto(msg, dest)
+	except Exception:
+		time.sleep(0.5)
+	finally:
+		if fd is not None:
+			try:
+				os.close(fd)
+			except Exception:
+				pass
+"""
+
 
 func _ready() -> void:
 	randomize()
 	_load_high_score()
+	_start_sensor_listener()
 	input_router.target_activated.connect(_on_target_activated)
 	cast_capture.step_confirmed.connect(_on_step_confirmed)
 	cast_capture.prefix_changed.connect(_on_prefix_changed)
@@ -139,6 +208,10 @@ func _ready() -> void:
 		attack_effect.visible = false
 		attack_effect.animation_finished.connect(_on_attack_effect_finished)
 	_abort_round()
+
+
+func _exit_tree() -> void:
+	_stop_sensor_listener()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -164,6 +237,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
+	_poll_sensor_udp()
 	if not _round_active or _paused:
 		return
 
@@ -516,8 +590,69 @@ func maxi_float(a: float, b: float) -> float:
 	return a if a > b else b
 
 
+func _start_sensor_listener() -> void:
+	_udp_peer = PacketPeerUDP.new()
+	var err: Error = _udp_peer.bind(sensor_udp_port, "0.0.0.0")
+	if err != OK:
+		push_warning("Main: Could not bind UDP port %d (error %d)." % [sensor_udp_port, err])
+	if auto_start_serial_bridge and OS.get_name() == "Linux":
+		var args: PackedStringArray = [
+			"-u",
+			"-c",
+			SERIAL_BRIDGE_PY,
+			str(sensor_udp_port),
+			serial_port,
+			str(serial_baud),
+		]
+		_serial_bridge_pid = OS.create_process("python3", args)
+
+
+func _stop_sensor_listener() -> void:
+	if _serial_bridge_pid > 0:
+		OS.kill(_serial_bridge_pid)
+		_serial_bridge_pid = -1
+	if _udp_peer != null:
+		_udp_peer.close()
+		_udp_peer = null
+
+
+func _poll_sensor_udp() -> void:
+	if _udp_peer == null:
+		return
+	while _udp_peer.get_available_packet_count() > 0:
+		var raw: String = _udp_peer.get_packet().get_string_from_utf8().strip_edges().to_upper()
+		if not raw.is_empty():
+			_handle_sensor_message(raw)
+
+
+func _handle_sensor_message(msg: String) -> void:
+	match msg:
+		"A", "1", "LEFT", "L":
+			_on_target_activated(GameTypes.Target.LEFT)
+		"B", "2", "CENTER", "C_LANE", "M":
+			_on_target_activated(GameTypes.Target.CENTER)
+		"C", "3", "RIGHT", "R_LANE":
+			_on_target_activated(GameTypes.Target.RIGHT)
+		"START", "S":
+			if not _round_active:
+				_start_round(
+					hud.get_login_text(),
+					hud.is_random_mode_selected(),
+					hud.is_wild_mode_selected(),
+					hud.get_selected_speed(game_speed),
+				)
+		"RESET", "R":
+			_abort_round()
+
+
+func _storage_path(file_name: String) -> String:
+	if OS.has_feature("editor"):
+		return ProjectSettings.globalize_path("res://" + file_name)
+	return OS.get_executable_path().get_base_dir().path_join(file_name)
+
+
 func _load_high_score() -> void:
-	var path: String = ProjectSettings.globalize_path(HIGH_SCORE_FILE)
+	var path: String = _storage_path(HIGH_SCORE_FILE)
 	if not FileAccess.file_exists(path):
 		return
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
@@ -541,8 +676,8 @@ func _record_completed_game(login: String, score: float, break_points: int) -> v
 		_active_speed,
 	]
 
-	# 1. Append to game_log.csv in project folder.
-	var log_path: String = ProjectSettings.globalize_path(GAME_LOG_FILE)
+	# 1. Append to game_log.csv in project/executable folder.
+	var log_path: String = _storage_path(GAME_LOG_FILE)
 	var write_header: bool = not FileAccess.file_exists(log_path)
 	var log_file: FileAccess = FileAccess.open(
 		log_path,
@@ -565,7 +700,7 @@ func _record_completed_game(login: String, score: float, break_points: int) -> v
 	if score >= _high_score:
 		_high_score = score
 		_high_score_holder = safe_login
-		var hs_path: String = ProjectSettings.globalize_path(HIGH_SCORE_FILE)
+		var hs_path: String = _storage_path(HIGH_SCORE_FILE)
 		var hs_file: FileAccess = FileAccess.open(hs_path, FileAccess.WRITE)
 		if hs_file != null:
 			hs_file.store_line("%s,%.1f,%d,%s,%s" % [
