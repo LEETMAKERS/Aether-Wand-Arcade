@@ -325,7 +325,7 @@ script = ExtResource("2_l3cfh")
 [node name="CastCapture" type="Node" parent="."]
 script = ExtResource("3_l3cfh")
 
-[node name="Hud" type="CanvasLayer" parent="." node_paths=PackedStringArray("status_label", "result_label", "style_label", "left_prompt", "center_prompt", "right_prompt", "left_card", "center_card", "right_card", "left_card_icon", "center_card_icon", "right_card_icon", "recipe_slot_1", "recipe_slot_2", "recipe_slot_3", "recipe_icon_1", "recipe_icon_2", "recipe_icon_3", "prepared_slot", "prepared_icon", "phase_plate", "timer_label", "break_label", "score_label", "break_bar", "summoner_icon", "menu_panel", "menu_title_label", "high_score_label", "login_input", "start_button", "open_settings_button", "settings_panel", "settings_title_label", "random_toggle", "wild_toggle", "speed_slider", "speed_value_label", "restart_button", "close_settings_button")]
+[node name="Hud" type="CanvasLayer" parent="." node_paths=PackedStringArray("status_label", "result_label", "style_label", "left_prompt", "center_prompt", "right_prompt", "left_card", "center_card", "right_card", "left_card_icon", "center_card_icon", "right_card_icon", "recipe_slot_1", "recipe_slot_2", "recipe_slot_3", "recipe_icon_1", "recipe_icon_2", "recipe_icon_3", "prepared_slot", "prepared_icon", "phase_plate", "timer_label", "break_label", "score_label", "break_bar", "summoner_icon", "menu_panel", "menu_title_label", "high_score_label", "login_input", "start_button", "open_settings_button", "settings_panel", "settings_title_label", "random_toggle", "wild_toggle", "speed_slider", "speed_value_label", "perfect_window_slider", "perfect_window_label", "good_window_slider", "good_window_label", "approach_time_slider", "approach_time_label", "break_target_slider", "break_target_label", "max_score_break_slider", "max_score_break_label", "restart_button", "close_settings_button")]
 script = ExtResource("3_6q06x")
 status_label = NodePath("Root/BottomBar/PreparedGroup/PhasePlate/StatusLabel")
 result_label = NodePath("Root/ResultLabel")
@@ -376,6 +376,16 @@ random_toggle = NodePath("Root/SettingsPanel/Content/RandomToggle")
 wild_toggle = NodePath("Root/SettingsPanel/Content/WildToggle")
 speed_slider = NodePath("Root/SettingsPanel/Content/SpeedSlider")
 speed_value_label = NodePath("Root/SettingsPanel/Content/SpeedValueLabel")
+perfect_window_slider = NodePath("Root/SettingsPanel/Content/PerfectWindowSlider")
+perfect_window_label = NodePath("Root/SettingsPanel/Content/PerfectWindowLabel")
+good_window_slider = NodePath("Root/SettingsPanel/Content/GoodWindowSlider")
+good_window_label = NodePath("Root/SettingsPanel/Content/GoodWindowLabel")
+approach_time_slider = NodePath("Root/SettingsPanel/Content/ApproachTimeSlider")
+approach_time_label = NodePath("Root/SettingsPanel/Content/ApproachTimeLabel")
+break_target_slider = NodePath("Root/SettingsPanel/Content/BreakTargetSlider")
+break_target_label = NodePath("Root/SettingsPanel/Content/BreakTargetLabel")
+max_score_break_slider = NodePath("Root/SettingsPanel/Content/MaxScoreBreakSlider2")
+max_score_break_label = NodePath("Root/SettingsPanel/Content/MaxScoreBreakLabel2")
 restart_button = NodePath("Root/SettingsPanel/Content/RestartButton")
 close_settings_button = NodePath("Root/SettingsPanel/Content/BackButton")
 
@@ -795,10 +805,10 @@ text = "SETTINGS"
 
 [node name="SettingsPanel" type="NinePatchRect" parent="Hud/Root"]
 layout_mode = 0
-offset_left = 610.0
-offset_top = 160.0
-offset_right = 1310.0
-offset_bottom = 580.0
+offset_left = 550.0
+offset_top = 45.0
+offset_right = 1370.0
+offset_bottom = 745.0
 texture = ExtResource("7_blune")
 region_rect = Rect2(71, 68, 882, 640)
 patch_margin_left = 40
@@ -809,14 +819,14 @@ patch_margin_bottom = 40
 [node name="Content" type="VBoxContainer" parent="Hud/Root/SettingsPanel"]
 layout_mode = 0
 offset_left = 50.0
-offset_top = 40.0
-offset_right = 650.0
-offset_bottom = 381.0
-theme_override_constants/separation = 20
+offset_top = 35.0
+offset_right = 770.0
+offset_bottom = 665.0
+theme_override_constants/separation = 8
 
 [node name="MenuTitleLabel" type="Label" parent="Hud/Root/SettingsPanel/Content"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 26
 text = "SETTINGS"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -831,6 +841,7 @@ text = "Wild Mode (3 / 10 Break)"
 
 [node name="SpeedValueLabel" type="Label" parent="Hud/Root/SettingsPanel/Content"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "GAME SPEED: 1.0x"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -841,6 +852,76 @@ min_value = 0.4
 max_value = 2.5
 step = 0.1
 value = 1.0
+
+[node name="PerfectWindowLabel" type="Label" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Perfect Window: ±50 ms"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PerfectWindowSlider" type="HSlider" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+min_value = 20.0
+max_value = 200.0
+step = 5.0
+value = 50.0
+
+[node name="GoodWindowLabel" type="Label" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Good Window: ±130 ms"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="GoodWindowSlider" type="HSlider" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+min_value = 60.0
+max_value = 400.0
+step = 10.0
+value = 130.0
+
+[node name="ApproachTimeLabel" type="Label" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Monster Walk Time: 2100 ms"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ApproachTimeSlider" type="HSlider" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+min_value = 800.0
+max_value = 3500.0
+step = 100.0
+value = 2100.0
+
+[node name="BreakTargetLabel" type="Label" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Win Target: 100 Break"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BreakTargetSlider" type="HSlider" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+min_value = 30.0
+max_value = 180.0
+step = 5.0
+value = 100.0
+
+[node name="MaxScoreBreakLabel2" type="Label" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Break for 10.0 Score: 140"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MaxScoreBreakSlider2" type="HSlider" parent="Hud/Root/SettingsPanel/Content"]
+layout_mode = 2
+min_value = 40.0
+max_value = 210.0
+step = 5.0
+value = 140.0
 
 [node name="RestartButton" type="Button" parent="Hud/Root/SettingsPanel/Content"]
 layout_mode = 2

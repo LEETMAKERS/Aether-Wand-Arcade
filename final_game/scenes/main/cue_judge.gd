@@ -27,13 +27,21 @@ const TROOP_HP: int = 2
 
 ## Grade a release timestamp against contact time. A release with no eligible
 ## fourth input is reported as MISS by the caller; this grades an actual press.
-static func grade_timing(release_ms: int, contact_ms: int) -> Timing:
+static func grade_timing(
+	release_ms: int,
+	contact_ms: int,
+	perfect_window_ms: int = PERFECT_BEFORE_MS,
+	good_before_ms: int = GOOD_BEFORE_MS,
+	good_after_ms: int = GOOD_AFTER_MS,
+) -> Timing:
 	var delta: int = release_ms - contact_ms # Negative is early, positive late.
-	if delta >= -PERFECT_BEFORE_MS and delta <= PERFECT_AFTER_MS:
+	var eff_good_before: int = maxi(good_before_ms, perfect_window_ms)
+	var eff_good_after: int = maxi(good_after_ms, perfect_window_ms)
+	if delta >= -perfect_window_ms and delta <= perfect_window_ms:
 		return Timing.PERFECT
-	if delta >= -GOOD_BEFORE_MS and delta <= GOOD_AFTER_MS:
+	if delta >= -eff_good_before and delta <= eff_good_after:
 		return Timing.GOOD
-	if delta < -GOOD_BEFORE_MS:
+	if delta < -eff_good_before:
 		return Timing.EARLY
 	return Timing.MISS # Later than the Good window.
 

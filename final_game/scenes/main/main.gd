@@ -9,8 +9,20 @@ enum CueState { IDLE, ACTIVE, RESOLVED }
 @export var hud: Hud # Display only.
 @export var cast_capture: CastCapture # Prefix, commit, 30 ms confirmation.
 @export var troop_scene: PackedScene # troop.tscn, instanced per cue.
+
+@export_group("Difficulty & Scoring Tuning")
 ## Overall game speed multiplier (0.5 = slower, 1.0 = normal, 1.5+ = faster).
 @export_range(0.4, 2.5, 0.1) var game_speed: float = 1.0
+## Half-width of the Perfect release window around contact T, in milliseconds.
+@export_range(20, 200, 5) var perfect_window_ms: int = 50
+## Half-width of the Good/Great release window around contact T, in milliseconds.
+@export_range(60, 400, 10) var good_window_ms: int = 130
+## How long (ms at 1.0x speed) a troop takes to walk from the gate to the line.
+@export_range(800, 3500, 100) var cue_lead_ms: int = 2100
+## Break points required to defeat the Summoner (Victory threshold).
+@export_range(30, 180, 5) var break_target: int = 100
+## Break points required to achieve a 10.0 score (lower = easier to get 10.0!).
+@export_range(40, 210, 5) var break_for_max_score: int = 140
 
 @export_group("Optional layout markers")
 ## Lane positions. If unassigned, viewport-relative defaults are used.
@@ -25,13 +37,6 @@ enum CueState { IDLE, ACTIVE, RESOLVED }
 const START_CUE_ACTION: StringName = &"start_cue"
 const RESET_ACTION: StringName = &"reset_cast"
 
-## Baseline cue lead time before contact time T (scaled by game_speed).
-const BASE_CUE_OPEN_LEAD_MS: int = 2100
-## Latest eligible release is T+120 ms; confirmation may finish through T+150.
-const MISS_DEADLINE_AFTER_MS: int = CueJudge.GOOD_AFTER_MS + CastCapture.CONFIRM_INTERVAL_MS
-
-## Victory target for Break accumulation.
-const BREAK_TARGET: int = 100
 ## Baseline round duration in milliseconds (60 seconds at 1.0x speed).
 const BASE_ROUND_DURATION_MS: int = 60000
 
@@ -86,7 +91,7 @@ var _paused: bool = false
 var _pause_start_ms: int = 0
 var _round_start_ms: int = 0
 var _active_speed: float = 1.0
-var _active_lead_ms: int = BASE_CUE_OPEN_LEAD_MS
+var _active_lead_ms: int = 2100
 var _active_round_duration_ms: int = BASE_ROUND_DURATION_MS
 var _schedule: Array[CueDef] = []
 var _next_cue_index: int = 0
@@ -121,7 +126,15 @@ func _ready() -> void:
 	hud.start_round_requested.connect(_on_start_round_requested)
 	hud.resume_requested.connect(_resume_round)
 	hud.restart_requested.connect(_on_restart_requested)
-	hud.set_initial_speed(game_speed)
+	hud.tuning_changed.connect(_on_tuning_changed)
+	hud.set_initial_tuning(
+		game_speed,
+		perfect_window_ms,
+		good_window_ms,
+		cue_lead_ms,
+		break_target,
+		break_for_max_score,
+	)
 	if attack_effect != null:
 		attack_effect.visible = false
 		attack_effect.animation_finished.connect(_on_attack_effect_finished)
@@ -178,7 +191,8 @@ func _process(_delta: float) -> void:
 			return
 
 		# Unfinished: wait out any eligible pending input before declaring a miss.
-		if now_ms >= _cue.contact_ms + MISS_DEADLINE_AFTER_MS \
+		var miss_deadline_ms: int = _live_good_ms() + CastCapture.CONFIRM_INTERVAL_MS
+		if now_ms >= _cue.contact_ms + miss_deadline_ms \
 				and not cast_capture.has_pending():
 			_apply(CueJudge.make_miss())
 			return
@@ -187,6 +201,13 @@ func _process(_delta: float) -> void:
 	if _next_cue_index >= _schedule.size() and _state != CueState.ACTIVE \
 			and elapsed_ms >= _active_round_duration_ms:
 		_finish_round()
+
+
+func _on_tuning_changed() -> void:
+	var base_lead: int = hud.get_selected_approach_ms(cue_lead_ms)
+	_active_lead_ms = int(roundf(float(base_lead) / maxi_float(_active_speed, 0.4)))
+	hud.show_round_progress(_break_total, _live_break_target())
+	hud.show_score(_compute_score(_break_total))
 
 
 func _on_start_round_requested(
@@ -230,6 +251,8 @@ func _resume_round() -> void:
 	for i: int in range(_next_cue_index, _schedule.size()):
 		_schedule[i].contact_ms += paused_ms
 	cast_capture.shift_timestamps(paused_ms)
+	_wild_enabled = hud.is_wild_mode_selected()
+	_on_tuning_changed()
 	_paused = false
 	if _troop != null and is_instance_valid(_troop) and _troop.animated_sprite != null:
 		_troop.animated_sprite.play()
@@ -251,7 +274,8 @@ func _start_round(
 	_use_random_cues = random_cues
 	_wild_enabled = wild_enabled
 	_active_speed = clampf(speed_scale, 0.4, 2.5)
-	_active_lead_ms = int(roundf(float(BASE_CUE_OPEN_LEAD_MS) / _active_speed))
+	var base_lead: int = hud.get_selected_approach_ms(cue_lead_ms)
+	_active_lead_ms = int(roundf(float(base_lead) / _active_speed))
 	_active_round_duration_ms = int(roundf(float(BASE_ROUND_DURATION_MS) / _active_speed))
 	_break_total = 0
 	_round_start_ms = Time.get_ticks_msec()
@@ -260,7 +284,7 @@ func _start_round(
 	_round_active = true
 	hud.show_menu(false)
 	hud.reset_display()
-	hud.show_round_progress(_break_total, BREAK_TARGET)
+	hud.show_round_progress(_break_total, _live_break_target())
 	hud.show_score(1.0)
 	hud.show_timer(float(_active_round_duration_ms) / 1000.0)
 
@@ -343,7 +367,7 @@ func _abort_round() -> void:
 		attack_effect.stop()
 		attack_effect.visible = false
 	hud.reset_display()
-	hud.show_round_progress(_break_total, BREAK_TARGET)
+	hud.show_round_progress(_break_total, _live_break_target())
 	hud.show_timer(float(BASE_ROUND_DURATION_MS) / 1000.0)
 	hud.show_menu(true, "RUNEWEAVE", _format_high_score_text())
 
@@ -353,8 +377,8 @@ func _finish_round() -> void:
 	_round_active = false
 	_state = CueState.IDLE
 	cast_capture.close()
-	var final_score: float = _compute_score(_break_total, _wild_enabled)
-	var victory: bool = _break_total >= BREAK_TARGET
+	var final_score: float = _compute_score(_break_total)
+	var victory: bool = _break_total >= _live_break_target()
 	hud.show_score(final_score)
 	_record_completed_game(_player_login, final_score, _break_total)
 	var banner: String = "%s! SCORE %.1f" % [
@@ -393,7 +417,15 @@ func _on_committed(
 ) -> void:
 	if _state != CueState.ACTIVE:
 		return
-	var timing: CueJudge.Timing = CueJudge.grade_timing(release_ms, _cue.contact_ms)
+	var p_ms: int = _live_perfect_ms()
+	var g_ms: int = _live_good_ms()
+	var timing: CueJudge.Timing = CueJudge.grade_timing(
+		release_ms,
+		_cue.contact_ms,
+		p_ms,
+		g_ms,
+		g_ms,
+	)
 	_pending_element = element
 	_pending_lane = lane
 	_pending_result = CueJudge.judge(_cue, element, lane, timing, style)
@@ -426,8 +458,8 @@ func _apply(result: JudgeResult) -> void:
 		_troop.show_outcome(result)
 		_troop = null
 	hud.show_judgment(result)
-	hud.show_round_progress(_break_total, BREAK_TARGET)
-	hud.show_score(_compute_score(_break_total, _wild_enabled))
+	hud.show_round_progress(_break_total, _live_break_target())
+	hud.show_score(_compute_score(_break_total))
 
 
 func _play_attack_effect(
@@ -456,12 +488,32 @@ func _on_attack_effect_finished() -> void:
 		attack_effect.visible = false
 
 
-## Compute 1.0-10.0 score with decimal half-up rounding to 0.1.
-func _compute_score(break_points: int, wild_enabled: bool) -> float:
-	var max_per_cue: int = CueJudge.BREAK_WILD_PERFECT if wild_enabled else CueJudge.BREAK_CLEAN_PERFECT
-	var max_available: int = PRESET_CONTACT_MS.size() * max_per_cue
-	var raw: float = clampf(1.0 + 9.0 * float(break_points) / float(max_available), 1.0, 10.0)
+## Compute 1.0-10.0 score using the configurable Break ceiling for 10.0.
+## Lowering `break_for_max_score` (or the slider in Settings) makes 10.0 easier!
+func _compute_score(break_points: int) -> float:
+	var ceiling: int = maxi(_live_max_score_break(), 1)
+	var raw: float = clampf(1.0 + 9.0 * float(break_points) / float(ceiling), 1.0, 10.0)
 	return floorf(raw * 10.0 + 0.5) / 10.0
+
+
+func _live_perfect_ms() -> int:
+	return hud.get_selected_perfect_ms(perfect_window_ms)
+
+
+func _live_good_ms() -> int:
+	return maxi(hud.get_selected_good_ms(good_window_ms), _live_perfect_ms())
+
+
+func _live_break_target() -> int:
+	return hud.get_selected_break_target(break_target)
+
+
+func _live_max_score_break() -> int:
+	return hud.get_selected_max_score_break(break_for_max_score)
+
+
+func maxi_float(a: float, b: float) -> float:
+	return a if a > b else b
 
 
 func _load_high_score() -> void:

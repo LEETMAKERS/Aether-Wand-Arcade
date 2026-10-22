@@ -4,7 +4,7 @@ extends CanvasLayer
 ##
 ## This node makes no gameplay decisions and never recounts inputs. It updates
 ## labels, swaps card/slot icons, colors text by phase/element/outcome, and
-## emits start_round_requested when the player starts a round from the menu.
+## emits signals when the player starts, pauses/resumes, or tunes settings.
 
 signal start_round_requested(
 	login: String,
@@ -14,7 +14,7 @@ signal start_round_requested(
 )
 signal resume_requested()
 signal restart_requested()
-signal main_menu_requested()
+signal tuning_changed()
 
 @export_group("Text Labels")
 @export var status_label: Label
@@ -77,6 +77,16 @@ signal main_menu_requested()
 @export var wild_toggle: BaseButton
 @export var speed_slider: Range
 @export var speed_value_label: Label
+@export var perfect_window_slider: Range
+@export var perfect_window_label: Label
+@export var good_window_slider: Range
+@export var good_window_label: Label
+@export var approach_time_slider: Range
+@export var approach_time_label: Label
+@export var break_target_slider: Range
+@export var break_target_label: Label
+@export var max_score_break_slider: Range
+@export var max_score_break_label: Label
 @export var restart_button: BaseButton
 @export var close_settings_button: BaseButton
 
@@ -159,16 +169,58 @@ func _ready() -> void:
 	if speed_slider != null:
 		speed_slider.value_changed.connect(_on_speed_slider_changed)
 		_on_speed_slider_changed(speed_slider.value)
+	if perfect_window_slider != null:
+		perfect_window_slider.value_changed.connect(_on_perfect_window_changed)
+		_on_perfect_window_changed(perfect_window_slider.value)
+	if good_window_slider != null:
+		good_window_slider.value_changed.connect(_on_good_window_changed)
+		_on_good_window_changed(good_window_slider.value)
+	if approach_time_slider != null:
+		approach_time_slider.value_changed.connect(_on_approach_time_changed)
+		_on_approach_time_changed(approach_time_slider.value)
+	if break_target_slider != null:
+		break_target_slider.value_changed.connect(_on_break_target_changed)
+		_on_break_target_changed(break_target_slider.value)
+	if max_score_break_slider != null:
+		max_score_break_slider.value_changed.connect(_on_max_score_break_changed)
+		_on_max_score_break_changed(max_score_break_slider.value)
 	if settings_panel != null:
 		settings_panel.visible = false
 	reset_display()
 
 
-## Initialize the speed slider from Main's default game_speed export.
-func set_initial_speed(speed_value: float) -> void:
+## Initialize all tuning sliders from Main's default @export properties.
+func set_initial_tuning(
+	speed_value: float,
+	perfect_ms: int,
+	good_ms: int,
+	approach_ms: int,
+	break_target_val: int,
+	max_score_break_val: int,
+) -> void:
 	if speed_slider != null:
 		speed_slider.value = speed_value
 	_on_speed_slider_changed(speed_value)
+
+	if perfect_window_slider != null:
+		perfect_window_slider.value = float(perfect_ms)
+	_on_perfect_window_changed(float(perfect_ms))
+
+	if good_window_slider != null:
+		good_window_slider.value = float(good_ms)
+	_on_good_window_changed(float(good_ms))
+
+	if approach_time_slider != null:
+		approach_time_slider.value = float(approach_ms)
+	_on_approach_time_changed(float(approach_ms))
+
+	if break_target_slider != null:
+		break_target_slider.value = float(break_target_val)
+	_on_break_target_changed(float(break_target_val))
+
+	if max_score_break_slider != null:
+		max_score_break_slider.value = float(max_score_break_val)
+	_on_max_score_break_changed(float(max_score_break_val))
 
 
 ## Animate the confirmed card tap and fill the corresponding recipe slot (0..2).
@@ -390,6 +442,36 @@ func get_selected_speed(default_speed: float = 1.0) -> float:
 	return default_speed
 
 
+func get_selected_perfect_ms(default_ms: int = 50) -> int:
+	if perfect_window_slider != null and perfect_window_slider.value > 0.0:
+		return int(roundf(perfect_window_slider.value))
+	return default_ms
+
+
+func get_selected_good_ms(default_ms: int = 130) -> int:
+	if good_window_slider != null and good_window_slider.value > 0.0:
+		return int(roundf(good_window_slider.value))
+	return default_ms
+
+
+func get_selected_approach_ms(default_ms: int = 2100) -> int:
+	if approach_time_slider != null and approach_time_slider.value > 0.0:
+		return int(roundf(approach_time_slider.value))
+	return default_ms
+
+
+func get_selected_break_target(default_target: int = 100) -> int:
+	if break_target_slider != null and break_target_slider.value > 0.0:
+		return int(roundf(break_target_slider.value))
+	return default_target
+
+
+func get_selected_max_score_break(default_max: int = 140) -> int:
+	if max_score_break_slider != null and max_score_break_slider.value > 0.0:
+		return int(roundf(max_score_break_slider.value))
+	return default_max
+
+
 func is_typing_login() -> bool:
 	return login_input != null and login_input.visible and login_input.has_focus()
 
@@ -425,6 +507,37 @@ func _on_restart_pressed() -> void:
 func _on_speed_slider_changed(value: float) -> void:
 	if speed_value_label != null:
 		speed_value_label.text = "GAME SPEED: %.1fx" % value
+	tuning_changed.emit()
+
+
+func _on_perfect_window_changed(value: float) -> void:
+	if perfect_window_label != null:
+		perfect_window_label.text = "PERFECT WINDOW: ±%d ms" % int(roundf(value))
+	tuning_changed.emit()
+
+
+func _on_good_window_changed(value: float) -> void:
+	if good_window_label != null:
+		good_window_label.text = "GREAT WINDOW: ±%d ms" % int(roundf(value))
+	tuning_changed.emit()
+
+
+func _on_approach_time_changed(value: float) -> void:
+	if approach_time_label != null:
+		approach_time_label.text = "APPROACH TIME: %.2fs" % (value / 1000.0)
+	tuning_changed.emit()
+
+
+func _on_break_target_changed(value: float) -> void:
+	if break_target_label != null:
+		break_target_label.text = "VICTORY TARGET: %d BREAK" % int(roundf(value))
+	tuning_changed.emit()
+
+
+func _on_max_score_break_changed(value: float) -> void:
+	if max_score_break_label != null:
+		max_score_break_label.text = "BREAK FOR 10.0 SCORE: %d" % int(roundf(value))
+	tuning_changed.emit()
 
 
 func _on_start_button_pressed() -> void:
