@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dn2ghmeoaaiij"
+
+[deps]
+
+files=["res://game_log.score.translation", "res://game_log.break.translation", "res://game_log.mode.translation", "res://game_log.played.translation"]
+
+source_file="res://game_log.csv"
+dest_files=["res://game_log.score.translation", "res://game_log.break.translation", "res://game_log.mode.translation", "res://game_log.played.translation"]
+
+[params]
+
+compress=true
+delimiter=0
