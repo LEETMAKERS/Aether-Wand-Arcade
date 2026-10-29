@@ -1,72 +1,97 @@
-# 🔮 Project: Aether-Wand Arcade (Working Title)
+# Aether-Wand-Arcade · Runeweave
 
-> **An invisible-interface arcade game where magnetic interactions bridge the physical and digital worlds.**
+A custom-controller arena caster. Counter approaching troops by preparing a spell with three sensor taps, then releasing it down the matching lane at the contact line. The controller is a 3D-printed wand and an ESP32-WROOM reading three analog IR sensors.
 
-![Breadboard Prototype Angle 1](assets/images/IMG_20260929_174427.jpg)
-![Breadboard Prototype Angle 2](assets/images/IMG_20260929_174452.jpg)
-
-*Figure 1: Proof-of-concept breadboard. 3x Hall Effect sensors wired to an ESP32. Two sensors are actively triggered by neodymium magnets (LEDs ON), one is idle (LED OFF).*
+Built for the robotics club integration game night. Game night went well.
 
 ---
 
-### 🧠 The Origin & Thought Process
+## The physical controller
 
-This project was born out of the Robotics Club Game Night, requiring a competitive scoring system (1-10 XP). The ideation process went through several deliberate phases to ensure the final product would be both novel and highly engaging:
+- **ESP32-WROOM** dev board.
+- **3 × analog IR proximity sensors** (active-low: HIGH at idle, drops LOW when a hand approaches).
+- **3D-printed wand** that breaks each sensor's detection field when tapped against the target.
+- USB cable from ESP32 to the host PC.
 
-**Phase 1: The Standalone Robotics Game**
+The ESP32 reads the three IR sensors on ADC1 pins (GPIO 34, 35, 32), applies per-sensor thresholds with hysteresis, and sends activation events over USB serial at 115200 baud. A Python bridge (auto-started by the game) forwards events to Godot over UDP localhost:4242.
 
-Initially, the goal was to build a game running entirely on a microcontroller (ESP32/Arduino), utilizing LEDs, small screens, and sensors. However, after evaluating several concepts (RPM cranks, distance guessing, pendulum drops), it became clear that while feasible, the games felt constrained. They lacked the visual and interactive depth required to sustain a fun, competitive environment for a game night.
+See [`hardware/README.md`](hardware/README.md) for wiring and [`firmware/README.md`](firmware/README.md) for the serial protocol.
 
-**Phase 2: Pivoting to Custom Controllers**
-
-To solve this, we pivoted our strategy. Instead of forcing a game to run natively on the limited hardware, we decided to use the microcontroller and sensors as a **custom physical controller** for a more robust PC game (built in Godot). This allowed us to separate the "fun" of the physical interaction from the processing limitations of the board.
-
-**Phase 3: Selecting the Sensor (The Novelty Factor)**
-
-When evaluating which sensors to use for the controller, we looked at potentiometers (sliders), rotary encoders (dials), and standard arcade buttons. We realized that these inputs mimic standard, everyday controllers (joysticks, steering wheels, buttons). Using them would result in a familiar, but not particularly novel, experience. 
-
-We wanted an interaction that felt different—something invisible and highly interactive. This led us to select the **Hall Effect sensor**. By hiding these magnetic switches beneath a smooth 3D-printed surface and giving the player a wand or sword with an embedded magnet, we created "invisible buttons." 
-
-**Phase 4: Hardware Validation**
-
-Before committing to game design, we rigorously tested the Hall sensors. We confirmed that they are bulletproof (digital ON/OFF, no analog jitter), capable of reading fast "swiping" motions with zero latency, and can reliably detect magnets through physical 3D-printed plastic. The core mechanic was proven viable.
+![Build photo](assets/images/build_photo_1.jpeg)
+![Build photo](assets/images/build_photo_2.jpeg)
+![Build photo](assets/images/build_photo_3.jpeg)
 
 ---
 
-### ⚙️ Tech Stack
-*   **Microcontroller:** ESP32
-*   **Sensors:** Digital Hall Effect Sensors
-*   **Game Engine:** Godot Engine (using GDScript)
-*   **Communication:** USB Serial (ESP32 -> PC)
+## How it plays
+
+1. A troop approaches in one of three lanes (Left / Center / Right) and shows its required counter-element.
+2. **Inputs 1–3** prepare your spell. Tap any three of the L/C/R targets with the wand. The recipe rule picks the element:
+   - If one target appears twice or more, its element wins (`LLL` → A, `LCL` → A).
+   - If all three differ, the third tap picks the element (`LCR` → C).
+3. **Input 4** selects the lane **and** releases. Tap the sensor of the lane you want to hit. Timing is judged against the troop's contact instant at the middle line.
+4. Correct element + correct lane + accurate release = best Break damage. Wrong element still hurts. Wrong lane, Early release, or unfinished spell = 0.
+5. Accumulate Break against the summoner. Reach 100 Break to win. Score is `1.0–10.0` based on Break vs the round maximum.
+
+A scored round is 60 seconds, 21 cues, 84 activations.
 
 ---
 
-### 🕹️ Current Game Concept & Mechanics (In Development)
+## Repository layout
 
-The specific game design is currently in the active ideation phase. The physical interaction is locked in, but the digital response is being explored. 
-
-**Current Design Directions:**
-*   **The Physical Prop:** The player will hold a 3D-printed prop (currently leaning toward a wand or a sword) with an embedded neodymium magnet.
-*   **The Interaction:** The game will be triggered by specific sensors being activated, or by the *sequence* in which the sensors are swiped/tapped.
-*   **The Theme:** We are exploring a combat-oriented theme, where swiping the sensors translates to strikes, parries, or spellcasting in the game.
-*   **Multiplayer:** There is strong potential for a 1v1 PvP mode, where two players use their physical props simultaneously to battle on screen.
-
----
-
-### 📊 Project Roadmap & Status
-
-| Phase | Description | Status | Notes |
-| :--- | :--- | :--- | :--- |
-| **Phase 1** | Hardware Validation (Sensors & ESP32) | ✅ **Complete** | 6 sensors tested. Fast taps and 3D-printed plastic penetration confirmed. |
-| **Phase 2** | Game Design & Mechanics Finalization | 🔄 **In Progress** | Finalizing the game idea, combat mechanics, and PvP viability. |
-| **Phase 3** | 3D Printed Assets & Enclosure Design | 🔄 **In Progress** | Designing the physical layout. The 3D design is a core game mechanic that dictates how the player interacts with the invisible sensors. |
-| **Phase 4** | Firmware & Serial Protocol | ⏳ **Pending** | Writing C++ code to send clean Serial data (e.g., `L`, `C`, `R`) to PC. |
-| **Phase 5** | Game Engine Core (Godot) | ⏳ **Pending** | Setting up Godot project, reading Serial data, and building the visual game loop. |
-| **Phase 6** | Polish & Game Night Prep | ⏳ **Pending** | Sound effects, lighting, and 1-10 XP scoring integration. |
+```
+Aether-Wand-Arcade/
+├── assets/images/       # Build photos
+├── final_game/          # Godot 4.5.1 project (source + docs)
+│   ├── scenes/          # GDScript: input_router, cast_capture, recipe_rules, cue_judge, hud, main, troop
+│   ├── assets/          # Fonts + sprite sheets
+│   └── docs/            # game-design, esp32-sensor-guide, settings-guide, tasks
+├── firmware/            # ESP32 firmware (.ino) + protocol docs
+├── hardware/            # Wiring + BOM
+├── models/              # 3D-print files (to be added)
+└── README.md
+```
 
 ---
 
-### 🚀 Next Steps
-1. Finalize the core game loop (Solo Combat vs. 1v1 PvP).
-2. Draft the 3D layout of the sensor array and the physical prop.
-3. Begin prototyping the serial communication bridge between the ESP32 and Godot.
+## How to run
+
+### From source (Godot 4.5.1)
+
+1. Flash [`firmware/runeweave_esp32.ino`](firmware/runeweave_esp32.ino) to the ESP32-WROOM (see [`firmware/README.md`](firmware/README.md)).
+2. Wire the sensors per [`hardware/README.md`](hardware/README.md).
+3. Open `final_game/project.godot` in **Godot 4.5.1 Standard**.
+4. Run the main scene. The game auto-starts the serial→UDP bridge.
+5. Keyboard fallback (`1`/`2`/`3` or `A`/`S`/`D`) works alongside the wand.
+
+### Linux USB permissions
+
+```bash
+sudo chmod a+rw /dev/ttyUSB* /dev/ttyACM*
+# or permanently: sudo usermod -a -G dialout $USER
+```
+
+---
+
+## Scoring
+
+```
+score = round( min(10, max(1, 1 + 9·D/M)) , 1 decimal )
+```
+
+- M = 168 (21 cues × 8 Break max). All Good → 7.8. All Perfect → 10.0. Zero Break → 1.0.
+
+---
+
+## Documentation
+
+- [`final_game/docs/game-design.md`](final_game/docs/game-design.md) — full design brief
+- [`final_game/docs/esp32-sensor-guide.md`](final_game/docs/esp32-sensor-guide.md) — sensor setup + Ubuntu commands
+- [`final_game/docs/settings-guide.md`](final_game/docs/settings-guide.md) — tunable values
+- [`final_game/docs/tasks.md`](final_game/docs/tasks.md) — development log
+- [`hardware/README.md`](hardware/README.md) — wiring
+- [`firmware/README.md`](firmware/README.md) — serial protocol
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).

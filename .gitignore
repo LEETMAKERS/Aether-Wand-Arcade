@@ -1,13 +1,52 @@
-# Godot 4+ specific ignores
+# --- Godot 4.5 ---
 .godot/
-/android/
-/builds/
+# .import files are committed for assets that ship with the project.
+# Do NOT add *.import here — that would untrack committed imports.
 
-# ESP32/Arduino build files
+# --- Godot export artifacts (do not commit built binaries) ---
+*.exe
+*.x86_64
+*.pck
 build/
-*.bin
-*.elf
+build_debug/
+final_build/
 
-# OS generated files
+# --- Runtime data (do not commit playtest logs) ---
+high_scores.txt
+sensor_telemetry.csv
+game_log.csv
+**/sensor_telemetry.csv
+**/game_log.csv
+**/sensor_telemetry.*.translation
+**/game_log.*.translation
+
+# --- OS junk ---
 .DS_Store
 Thumbs.db
+*.tmp
+tmp.md
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- ESP32 / Arduino ---
+firmware/build/
+*.elf
+*.map
+
+# --- KiCad ---
+hardware/schema/*.bak
+hardware/schema/*-bak
+hardware/schema/*-cache.lib
+hardware/schema/_autosave-*
+hardware/schema/*-rescue.lib
+
+# --- Archives / private ---
+*.tar.gz
+agy_chat_export.tar.gz
+
+# --- 3D print previews ---
+models/*.stl.png
