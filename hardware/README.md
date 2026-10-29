@@ -1,61 +1,40 @@
 # Hardware
 
-The Aether-Wand-Arcade controller is an ESP32-WROOM reading three analog IR proximity sensors through a 3D-printed wand.
+The controller is a small computer with three sensors and a 3D-printed wand.
 
-## Bill of materials
+## What you need
 
-| Part | Qty | Notes |
+| Part | How many | What it is |
 |---|---|---|
-| ESP32-WROOM dev board | 1 | Any variant with ADC1 pins exposed |
-| Analog IR proximity sensor | 3 | Active-low: HIGH at idle (~2000+), LOW when hand near (<200) |
-| USB cable (data, not charge-only) | 1 | ESP32 → host PC |
-| Jumper wires | ~12 | 3V3 + GND bus + 3 signal |
-| 3D-printed wand | 1 | See [`../models/`](../models/) |
-| 3D-printed sensor mounts | 3 | See [`../models/`](../models/) |
+| ESP32-WROOM | 1 | A small programmable board (about $5) |
+| Infrared sensor | 3 | Detects when something is close — same kind that turns off your phone screen near your ear |
+| USB cable | 1 | Connects the ESP32 to the computer (must carry data, not just charge) |
+| Jumper wires | ~12 | Wires to connect everything |
+| 3D-printed wand | 1 | The thing the player holds (files coming to `models/`) |
+| 3D-printed sensor mount | 1 | Holds all three sensors in place (files coming to `models/`) |
 
-## Pin map
+## How to wire it
 
-| Sensor | ESP32-WROOM GPIO | ADC | Game target |
-|---|---|---|---|
-| Left IR OUT | GPIO 34 | ADC1_CH6 | A (Left / Fire) |
-| Center IR OUT | GPIO 35 | ADC1_CH7 | B (Center / Ice) |
-| Right IR OUT | GPIO 32 | ADC1_CH4 | C (Right / Lightning) |
-| All VCC | 3V3 | — | Power |
-| All GND | GND | — | Common ground |
+Each sensor has three pins: power, ground, and signal. Connect them to the ESP32 like this:
 
-> Use ADC1 pins (32–39) on the ESP32-WROOM. ADC2 pins conflict with Wi-Fi. GPIO 34/35/32 are input-only ADC pins — perfect for reading analog sensors.
+| Sensor | ESP32 pin | What it does in the game |
+|---|---|---|
+| Left | GPIO 34 | Left lane / Fire |
+| Center | GPIO 35 | Center lane / Ice |
+| Right | GPIO 32 | Right lane / Lightning |
+| All power | 3V3 | Powers the sensors |
+| All ground | GND | Common ground |
 
-## Wiring
+The sensors are "active-low" — their reading is high when nothing is nearby and drops low when the wand gets close. The code on the ESP32 handles this automatically; you don't need to worry about it.
 
-```
-ESP32-WROOM              IR Sensor ×3
-─────────────            ┌──────────────────────────────┐
-3V3  ────────────────────┤ VCC  (all three sensors)      │
-GND  ────────────────────┤ GND  (all three sensors)      │
-GP34 ────────────────────┤ OUT  (Left sensor)            │
-GP35 ────────────────────┤ OUT  (Center sensor)          │
-GP32 ────────────────────┤ OUT  (Right sensor)           │
-                         └────────────────────────────────┘
-                  USB ────────► Host PC (Godot + bridge)
-```
+## Setting it up
 
-## Sensor behavior
-
-The IR sensors are **active-low analog**:
-- **Idle** (no hand near): ADC reads HIGH (~2000–4095).
-- **Hand near**: ADC reads LOW (<200, drops sharply).
-
-The firmware applies per-sensor thresholds (default `triggerBelow=200`, `releaseAbove=1000`) with hysteresis to prevent double-firing. Adjust these in [`../firmware/runeweave_esp32.ino`](../firmware/runeweave_esp32.ino) if a sensor triggers too easily or needs the hand closer.
-
-## Setup checklist
-
-1. Mount the three IR sensors side by side, spaced so the wand on one doesn't trigger its neighbors.
-2. Wire per the pin map above.
-3. Flash [`../firmware/runeweave_esp32.ino`](../firmware/runeweave_esp32.ino).
-4. Set `DEBUG_RAW_VALUES = true`, open Serial Monitor, wave your hand over each sensor to confirm raw readings.
-5. Set `DEBUG_RAW_VALUES = false` and close the Serial Monitor before launching the game.
-6. Give Ubuntu USB access: `sudo chmod a+rw /dev/ttyUSB*`.
+1. Mount the three sensors side by side. Space them apart so waving over one doesn't trigger the next one by accident.
+2. Wire them following the table above.
+3. Upload the code from [`../firmware/runeweave_esp32.ino`](../firmware/runeweave_esp32.ino) to the ESP32.
+4. On Linux, give the game permission to read the USB port: `sudo chmod a+rw /dev/ttyUSB*`
+5. Run the game. It finds the ESP32 automatically.
 
 ## Schematic
 
-Add a KiCad/Fritzing schematic in `schema/` if you make one. A photo of the wired breadboard works too.
+A wiring diagram is coming soon.

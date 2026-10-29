@@ -1,97 +1,71 @@
 # Aether-Wand-Arcade · Runeweave
 
-A custom-controller arena caster. Counter approaching troops by preparing a spell with three sensor taps, then releasing it down the matching lane at the contact line. The controller is a 3D-printed wand and an ESP32-WROOM reading three analog IR sensors.
+Runeweave is a video game you play with a real, physical wand — not a keyboard or a gamepad.
 
-Built for the robotics club integration game night. Game night went well.
+You stand in front of three sensors. You hold a small 3D-printed wand. Monsters walk toward you on screen, and you wave the wand over the sensors in the right order to cast spells and defeat them before they reach you.
 
----
-
-## The physical controller
-
-- **ESP32-WROOM** dev board.
-- **3 × analog IR proximity sensors** (active-low: HIGH at idle, drops LOW when a hand approaches).
-- **3D-printed wand** that breaks each sensor's detection field when tapped against the target.
-- USB cable from ESP32 to the host PC.
-
-The ESP32 reads the three IR sensors on ADC1 pins (GPIO 34, 35, 32), applies per-sensor thresholds with hysteresis, and sends activation events over USB serial at 115200 baud. A Python bridge (auto-started by the game) forwards events to Godot over UDP localhost:4242.
-
-See [`hardware/README.md`](hardware/README.md) for wiring and [`firmware/README.md`](firmware/README.md) for the serial protocol.
-
-![Build photo](assets/images/build_photo_1.jpeg)
-![Build photo](assets/images/build_photo_2.jpeg)
-![Build photo](assets/images/build_photo_3.jpeg)
+It was built for a robotics club game night. People played it, competed for high scores, and it went well.
 
 ---
 
-## How it plays
+## What's in this repo
 
-1. A troop approaches in one of three lanes (Left / Center / Right) and shows its required counter-element.
-2. **Inputs 1–3** prepare your spell. Tap any three of the L/C/R targets with the wand. The recipe rule picks the element:
-   - If one target appears twice or more, its element wins (`LLL` → A, `LCL` → A).
-   - If all three differ, the third tap picks the element (`LCR` → C).
-3. **Input 4** selects the lane **and** releases. Tap the sensor of the lane you want to hit. Timing is judged against the troop's contact instant at the middle line.
-4. Correct element + correct lane + accurate release = best Break damage. Wrong element still hurts. Wrong lane, Early release, or unfinished spell = 0.
-5. Accumulate Break against the summoner. Reach 100 Break to win. Score is `1.0–10.0` based on Break vs the round maximum.
-
-A scored round is 60 seconds, 21 cues, 84 activations.
+| Folder | What it is |
+|---|---|
+| `final_game/` | The game itself — built in Godot 4.5.1. All the code, art, and scenes. |
+| `firmware/` | The code that runs on the ESP32 (the small computer inside the wand controller). |
+| `hardware/` | How to wire the sensors to the ESP32. |
+| `models/` | 3D-printable files for the wand and sensor mount (coming soon). |
+| `assets/images/` | Photos of the build. |
 
 ---
 
-## Repository layout
+## How the game works
 
-```
-Aether-Wand-Arcade/
-├── assets/images/       # Build photos
-├── final_game/          # Godot 4.5.1 project (source + docs)
-│   ├── scenes/          # GDScript: input_router, cast_capture, recipe_rules, cue_judge, hud, main, troop
-│   ├── assets/          # Fonts + sprite sheets
-│   └── docs/            # game-design, esp32-sensor-guide, settings-guide, tasks
-├── firmware/            # ESP32 firmware (.ino) + protocol docs
-├── hardware/            # Wiring + BOM
-├── models/              # 3D-print files (to be added)
-└── README.md
-```
+Monsters come at you in three lanes — left, center, and right. Each monster shows a symbol telling you which element defeats it.
+
+1. **Prepare your spell** — wave the wand over any three sensors. The pattern you use decides which element you get:
+   - Wave over the same sensor twice or three times → that element wins.
+   - Wave over all three different sensors → the last one you used decides.
+2. **Release the spell** — wave over the sensor of the lane you want to hit. Time it so the spell lands when the monster crosses the middle line.
+3. **Score** — right element + right lane + good timing = the most points. Wrong element still hurts the monster a bit. Wrong lane or bad timing = nothing.
+
+A full round is **60 seconds**, **21 monsters**, and **84 inputs**. You get a score from **1.0 to 10.0** at the end.
 
 ---
 
-## How to run
+## How the controller works
 
-### From source (Godot 4.5.1)
+The wand controller is a small computer called an ESP32 with three infrared sensors attached. When you wave the wand over a sensor, the sensor notices and tells the game. The game then shows your spell flying at the monster.
 
-1. Flash [`firmware/runeweave_esp32.ino`](firmware/runeweave_esp32.ino) to the ESP32-WROOM (see [`firmware/README.md`](firmware/README.md)).
-2. Wire the sensors per [`hardware/README.md`](hardware/README.md).
-3. Open `final_game/project.godot` in **Godot 4.5.1 Standard**.
-4. Run the main scene. The game auto-starts the serial→UDP bridge.
-5. Keyboard fallback (`1`/`2`/`3` or `A`/`S`/`D`) works alongside the wand.
+It all happens almost instantly — under 2 milliseconds from wave to spell.
 
-### Linux USB permissions
+You don't need to understand any of that to play. You just wave the wand over the sensors and the game does the rest.
 
-```bash
-sudo chmod a+rw /dev/ttyUSB* /dev/ttyACM*
-# or permanently: sudo usermod -a -G dialout $USER
-```
+See [`final_game/docs/esp32-sensor-guide.md`](final_game/docs/esp32-sensor-guide.md) for the full explanation.
 
 ---
 
-## Scoring
+## Photos
 
-```
-score = round( min(10, max(1, 1 + 9·D/M)) , 1 decimal )
-```
-
-- M = 168 (21 cues × 8 Break max). All Good → 7.8. All Perfect → 10.0. Zero Break → 1.0.
+![The controller](assets/images/build_photo_1.jpeg)
+![The wand](assets/images/build_photo_2.jpeg)
+![Playing the game](assets/images/build_photo_3.jpeg)
 
 ---
 
-## Documentation
+## Want to build one yourself?
 
-- [`final_game/docs/game-design.md`](final_game/docs/game-design.md) — full design brief
-- [`final_game/docs/esp32-sensor-guide.md`](final_game/docs/esp32-sensor-guide.md) — sensor setup + Ubuntu commands
-- [`final_game/docs/settings-guide.md`](final_game/docs/settings-guide.md) — tunable values
-- [`final_game/docs/tasks.md`](final_game/docs/tasks.md) — development log
-- [`hardware/README.md`](hardware/README.md) — wiring
-- [`firmware/README.md`](firmware/README.md) — serial protocol
+You'll need:
+- An **ESP32** — a small, cheap programmable board (about $5)
+- **Three infrared sensors** — the kind that detect when something is close
+- A **3D-printed wand** and sensor mount (files coming to `models/`)
+- A computer with **Godot 4.5.1** installed
+
+Start with [`hardware/README.md`](hardware/README.md) for the wiring, then [`firmware/README.md`](firmware/README.md) for the code that goes on the ESP32.
+
+---
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE). You're free to copy, modify, and share.

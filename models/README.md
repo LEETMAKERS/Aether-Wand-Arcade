@@ -1,19 +1,15 @@
 # 3D Models
 
-3D-printable files for the Aether-Wand-Arcade controller. Files to be added.
+3D-printable files for the Aether-Wand-Arcade controller. Files coming soon.
 
 ## Planned files
 
 | File | Description | Status |
 |---|---|---|
-| `wand.stl` | The wand the player taps against the sensors | Pending |
-| `sensor_mount_left.stl` | Mount for the left IR sensor | Pending |
-| `sensor_mount_center.stl` | Mount for the center IR sensor | Pending |
-| `sensor_mount_right.stl` | Mount for the right IR sensor | Pending |
-| `base.stl` | Base holding the three sensor mounts in alignment | Pending |
+| `wand.stl` | The wand the player waves over the sensors | Pending |
+| `sensor_mount.stl` | The mount that holds all three IR sensors | Pending |
 
 ## Print notes
 
-- PLA or PETG. PETG recommended for the wand (impact resistance).
-- ≥30% infill on sensor mounts for rigidity.
-- Orient the wand so layer lines are parallel to the tapping surface to reduce delamination.
+- PLA or PETG.
+- ≥30% infill on the sensor mount for rigidity.

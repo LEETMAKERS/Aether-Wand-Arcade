@@ -1,61 +1,50 @@
-# ESP32-WROOM Analog IR Sensor Guide for Runeweave
+# The Controller: ESP32 and Sensors
 
-The canonical firmware lives in [`../../firmware/runeweave_esp32.ino`](../../firmware/runeweave_esp32.ino). This guide covers wiring, uploading, and the host-side bridge.
+This page explains how the physical controller works — the small computer, the sensors, and how they talk to the game. You don't need to understand any of this to play. But if you're curious or want to build one yourself, read on.
 
-## 1. Upload the firmware
+## The parts
 
-1. Open **Arduino IDE**, select board **ESP32 Dev Module**.
-2. Select port `/dev/ttyUSB0` (Linux).
-3. Open `firmware/runeweave_esp32.ino`.
-4. Set `DEBUG_RAW_VALUES = true` to tune thresholds in the Serial Monitor.
-5. Set `DEBUG_RAW_VALUES = false` before playing.
-6. Upload.
+- **ESP32-WROOM** — a small, cheap programmable board (about $5). It's the "brain" of the controller. It reads the sensors and sends messages to the computer.
+- **Three infrared sensors** — these detect when something is close. They're the same kind of sensor that turns off your phone screen when you hold it to your ear. Each one watches one lane (left, center, right).
+- **A 3D-printed wand** — the player waves this over the sensors.
 
-## 2. Wiring
+## How a wave becomes a spell
 
-| Sensor | ESP32-WROOM Pin | Game Target |
-| :--- | :--- | :--- |
-| **Left IR OUT** | **GPIO 34** | Target A (Left / Fire) |
-| **Center IR OUT** | **GPIO 35** | Target B (Center / Ice) |
-| **Right IR OUT** | **GPIO 32** | Target C (Right / Lightning) |
-| **All VCC** | **3V3** | Power |
-| **All GND** | **GND** | Ground |
+1. The player waves the wand over a sensor.
+2. The sensor's reading changes (it drops from high to low — "something is close").
+3. The ESP32 notices this change and sends a short message over USB: `A` for left, `B` for center, `C` for right.
+4. A helper program (started automatically by the game) passes this message to the Godot game.
+5. The game shows the spell flying at the monster.
 
-Sensors are active-low analog: HIGH (~2000+) at idle, LOW (<200) when a hand is near. See [`../../hardware/README.md`](../../hardware/README.md) for the full wiring guide.
+This all happens in under 2 milliseconds. It feels instant.
 
-## 3. Ubuntu setup
+## Wiring
 
-### Step 1: USB permissions
-```bash
-sudo chmod a+rw /dev/ttyUSB* /dev/ttyACM*
-# permanent: sudo usermod -a -G dialout $USER
-```
+| Sensor | ESP32 pin | Lane |
+|---|---|---|
+| Left | GPIO 34 | Left |
+| Center | GPIO 35 | Center |
+| Right | GPIO 32 | Right |
+| All power | 3V3 | — |
+| All ground | GND | — |
 
-### Step 2: Verify the ESP32 output
-Close Arduino Serial Monitor first (only one program can hold the port):
-```bash
-stty -F /dev/ttyUSB0 115200 raw -echo && cat /dev/ttyUSB0
-```
-Wave your hand over Left, Center, Right — you should see `A:val`, `B:val`, `C:val` lines.
+The ESP32 uses pins 34, 35, and 32 because those can read smoothly changing values (not just on/off). Some other pins on the ESP32 can't do this while Wi-Fi is turned on, so these three are the safe choice.
 
-### Step 3: Launch the game
-The game's `main.gd` auto-starts the Python USB-Serial → UDP bridge in the background. It auto-detects `/dev/ttyUSB0` (or fallbacks) at 115200 baud and reconnects if unplugged. Keyboard keys (`1`/`2`/`3` or `A`/`S`/`D`) work alongside the wand.
+## Running it yourself
 
-## 4. Troubleshooting
+1. **Upload the code** — open [`../../firmware/runeweave_esp32.ino`](../../firmware/runeweave_esp32.ino) in the Arduino IDE, select the ESP32 board, and upload it.
+2. **Wire the sensors** — follow the table above. See [`../../hardware/README.md`](../../hardware/README.md) for more detail.
+3. **Give USB permission** (Linux only) — `sudo chmod a+rw /dev/ttyUSB*`
+4. **Run the game** — open `final_game/` in Godot 4.5.1 and press play. The game finds the ESP32 automatically.
 
-### Test the receiver without the ESP32
+## Testing without the controller
+
+You can fake sensor triggers by sending messages directly to the game:
+
 ```bash
 echo "A" > /dev/udp/127.0.0.1/4242
 echo "B" > /dev/udp/127.0.0.1/4242
 echo "C" > /dev/udp/127.0.0.1/4242
 ```
 
-### Accepted messages on UDP 4242
-- `A` / `1` / `LEFT` → Left target
-- `B` / `2` / `CENTER` → Center target
-- `C` / `3` / `RIGHT` → Right target
-- `START` / `S` → Start round
-- `RESET` / `R` → Reset round
-
-### Adjust sensitivity
-In `firmware/runeweave_esp32.ino`, edit the per-sensor `triggerBelow` and `releaseAbove` values. Lower `triggerBelow` if the hand must get too close; raise it if it triggers by itself.
+This is useful if you want to try the game without building the controller.

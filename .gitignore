@@ -50,3 +50,6 @@ agy_chat_export.tar.gz
 
 # --- 3D print previews ---
 models/*.stl.png
+
+# --- Cleanup scripts ---
+cleanup*.sh
